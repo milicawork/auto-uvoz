@@ -1,36 +1,36 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Crossings
 
-## Getting Started
+What a used car from Europe actually costs once it lands in Serbia, Bosnia or Montenegro.
 
-First, run the development server:
+## The problem
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+A cheap German listing looks like a bargain until customs, VAT, transport and registration cost more than buying locally. No marketplace shows that full price.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## What it does
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Pick a source country (DE / AT / IT) and an import country (RS / BA / ME)
+- Search listings on both markets at once
+- Calculate landed cost: transport, customs, excise, VAT, registration
+- AI writes a verdict on whether import is worth it, including mileage and year
+- Click a row for a breakdown of every cost
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## How it works
 
-## Learn More
+- **Exa** — neural search across classifieds in multiple countries
+- **Grok (x.ai)** — extracts structured data from messy page text and writes the verdict
+- **Next.js + TypeScript**
+- **Render** — hosting
 
-To learn more about Next.js, take a look at the following resources:
+AI is used to make sense of unstructured listings. The customs calculation is deterministic in code, because the numbers have to be checkable.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Live demo
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+https://auto-uvoz.onrender.com
 
-## Deploy on Vercel
+## Disclaimer
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Rates are estimates based on publicly available information, not an official customs calculation.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Built at
+
+Grok Bot Serbia Hackathon, Belgrade, September 2026
