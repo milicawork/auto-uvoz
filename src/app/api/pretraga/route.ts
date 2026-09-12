@@ -279,7 +279,7 @@ export async function POST(request: Request) {
       return greska("Missing API keys (EXA_API_KEY or XAI_API_KEY).");
     }
 
-    const [izvorRezultati, destinacijaRezultati] = await Promise.all([
+    const [izvorRezultati, prvaDestinacija] = await Promise.all([
       exaPretraga(upitIzvor(model, izvor), SAJTOVI_IZVOR[izvor], exaApiKey),
       exaPretraga(
         upitDestinacija(model),
@@ -288,8 +288,20 @@ export async function POST(request: Request) {
       ),
     ]);
 
+    let destinacijaRezultati = prvaDestinacija;
+    if (destinacijaRezultati.length < 2) {
+      destinacijaRezultati = await exaPretraga(
+        model.trim(),
+        SAJTOVI_DESTINACIJA[destinacija],
+        exaApiKey,
+      );
+    }
+
     console.log(`Exa ${izvor} results:`, izvorRezultati.length);
-    console.log(`Exa ${destinacija} results:`, destinacijaRezultati.length);
+    console.log(
+      `Oglasi iz destinacije (${destinacija}):`,
+      destinacijaRezultati.length,
+    );
     console.log(
       `First ${izvor} result:`,
       JSON.stringify(izvorRezultati[0])?.slice(0, 800),
@@ -306,6 +318,8 @@ Rules:
 - If mileage is missing, use 150000.
 - If fuel is missing, use "dizel". Fuel must be "dizel" or "benzin".
 - Prices are in EUR.
+- Ako naziv već sadrži marku, ne ponavljaj je.
+Vrati čist naziv bez duplikata marke.
 - Do not filter by price, mileage, or year. Return everything you find.
 - If you truly cannot find any listing with a price, return [].
 Return at most 10 listings.`;

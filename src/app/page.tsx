@@ -70,6 +70,21 @@ function formatBroj(value: number) {
   return value.toLocaleString("en-US");
 }
 
+function nazivSaMarkom(naziv: string, marka: Marka | null) {
+  if (!marka) {
+    return naziv;
+  }
+
+  const markaNaziv = marka.naziv.trim();
+  if (
+    naziv.trim().toLowerCase().startsWith(markaNaziv.toLowerCase())
+  ) {
+    return naziv;
+  }
+
+  return `${markaNaziv} ${naziv}`;
+}
+
 function jeIzvor(zemlja: Zemlja): zemlja is Izvor {
   return zemlja === "DE" || zemlja === "AT" || zemlja === "IT";
 }
@@ -554,6 +569,7 @@ export default function Home() {
                           otvoren={otvoren}
                           onToggle={() => toggleRed(kljuc)}
                           red={red}
+                          marka={izabranaMarka}
                           stavke={stavke}
                         />
                       );
@@ -623,6 +639,7 @@ function FragmentRow({
   otvoren,
   onToggle,
   red,
+  marka,
   stavke,
 }: {
   jeNajjeftiniji: boolean;
@@ -630,6 +647,7 @@ function FragmentRow({
   otvoren: boolean;
   onToggle: () => void;
   red: Oglas;
+  marka: Marka | null;
   stavke: { label: string; value: number }[];
 }) {
   return (
@@ -647,7 +665,9 @@ function FragmentRow({
             {ZASTAVICE[red.zemlja]}
           </span>
         </td>
-        <td className="px-3 py-3.5 font-medium text-zinc-50">{red.naziv}</td>
+        <td className="px-3 py-3.5 font-medium text-zinc-50">
+          {nazivSaMarkom(red.naziv, marka)}
+        </td>
         <td className="whitespace-nowrap px-3 py-3.5 tabular-nums text-zinc-300">
           {red.godiste}
         </td>
