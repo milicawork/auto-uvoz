@@ -1,131 +1,148 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { izracunajUvoz } from "@/lib/uvoz";
 
-type Gorivo = "dizel" | "benzin";
-type Zemlja = "Nemačka" | "Srbija";
+type Zemlja = "DE" | "RS";
 
-type MockOglas = {
-  zemlja: Zemlja;
-  model: string;
-  godiste: number;
-  zapreminaCcm: number;
-  gorivo: Gorivo;
-  cenaEur: number;
-  kilometraza: number;
-};
-
-type RedTabele = {
-  zemlja: Zemlja;
-  model: string;
+type Oglas = {
   naziv: string;
+  zemlja: Zemlja;
   godiste: number;
-  kilometraza: number;
-  cenaOglasa: number;
-  transport: number | null;
-  carinaPdv: number | null;
+  km: number;
+  cenaEur: number;
+  url: string;
   ukupno: number;
 };
-
-const MOCK_OGLASI: MockOglas[] = [
-  {
-    zemlja: "Nemačka",
-    model: "VW Golf 7",
-    godiste: 2016,
-    zapreminaCcm: 1600,
-    gorivo: "dizel",
-    cenaEur: 8400,
-    kilometraza: 145000,
-  },
-  {
-    zemlja: "Nemačka",
-    model: "VW Golf 7",
-    godiste: 2017,
-    zapreminaCcm: 1600,
-    gorivo: "dizel",
-    cenaEur: 9900,
-    kilometraza: 110000,
-  },
-  {
-    zemlja: "Srbija",
-    model: "VW Golf 7",
-    godiste: 2016,
-    zapreminaCcm: 1600,
-    gorivo: "dizel",
-    cenaEur: 11900,
-    kilometraza: 160000,
-  },
-];
 
 function formatBroj(value: number) {
   return value.toLocaleString("sr-RS");
 }
 
-function mapirajOglas(oglas: MockOglas): RedTabele {
-  const naziv = `${oglas.model} ${oglas.godiste} (${oglas.zemlja})`;
+function zastavica(zemlja: Zemlja) {
+  return zemlja === "DE" ? "🇩🇪" : "🇷🇸";
+}
 
-  if (oglas.zemlja === "Srbija") {
-    return {
-      zemlja: oglas.zemlja,
-      model: oglas.model,
-      naziv,
-      godiste: oglas.godiste,
-      kilometraza: oglas.kilometraza,
-      cenaOglasa: oglas.cenaEur,
-      transport: null,
-      carinaPdv: null,
-      ukupno: oglas.cenaEur,
-    };
+function jeOglas(value: unknown): value is Oglas {
+  if (value == null || typeof value !== "object") {
+    return false;
   }
 
-  const uvoz = izracunajUvoz(
-    oglas.cenaEur,
-    oglas.zapreminaCcm,
-    oglas.godiste,
-    oglas.gorivo,
+  const oglas = value as Record<string, unknown>;
+  return (
+    typeof oglas.naziv === "string" &&
+    (oglas.zemlja === "DE" || oglas.zemlja === "RS") &&
+    typeof oglas.godiste === "number" &&
+    typeof oglas.km === "number" &&
+    typeof oglas.cenaEur === "number" &&
+    typeof oglas.url === "string" &&
+    typeof oglas.ukupno === "number"
   );
-
-  return {
-    zemlja: oglas.zemlja,
-    model: oglas.model,
-    naziv,
-    godiste: oglas.godiste,
-    kilometraza: oglas.kilometraza,
-    cenaOglasa: uvoz.cenaOglas,
-    transport: uvoz.transport,
-    carinaPdv: uvoz.carina + uvoz.akciza + uvoz.pdv,
-    ukupno: uvoz.ukupno,
-  };
 }
+
+const PORUKA_PRAZNO =
+  "Nije pronađen nijedan oglas, probaj drugi model";
+const PORUKA_UCITAVANJE =
+  "Pretražujem oglase u Nemačkoj i Srbiji... Pretraga može da traje do 30 sekundi.";
 
 export default function Home() {
   const [model, setModel] = useState("");
   const [maxCena, setMaxCena] = useState("");
   const [maxKilometraza, setMaxKilometraza] = useState("");
   const [godisteOd, setGodisteOd] = useState("");
-  const [rezultati, setRezultati] = useState<RedTabele[] | null>(null);
+  const [rezultati, setRezultati] = useState<Oglas[] | null>(null);
+  const [poruka, setPoruka] = useState<string | null>(null);
+  const [ucitava, setUcitava] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const redovi = MOCK_OGLASI.map(mapirajOglas).sort(
-      (a, b) => a.ukupno - b.ukupno,
-    );
-    setRezultati(redovi);
+    setUcitava(true);
+    setRezultati(null);
+    setPoruka(PORUKA_UCITAVANJE);
+
+    try {
+      const odgovor = await fetch("/api/pretraga", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: model.trim(),
+          maxCena: Number(maxCena),
+          maxKm: Number(maxKilometraza),
+          godisteOd: Number(godisteOd),
+        }),
+      });
+
+      const podaci: unknown = await odgovor.json();
+
+      if (!odgovor.ok || !Array.isArray(podaci)) {
+        setRezultati(null);
+        setPoruka(PORUKA_PRAZNO);
+        return;
+      }
+
+      const oglasi = podaci.filter(jeOglas).sort((a, b) => a.ukupno - b.ukupno);
+
+      if (oglasi.length === 0) {
+        setRezultati(null);
+        setPoruka(PORUKA_PRAZNO);
+        return;
+      }
+
+      setPoruka(null);
+      setRezultati(oglasi);
+    } catch {
+      setRezultati(null);
+      setPoruka(PORUKA_PRAZNO);
+    } finally {
+      setUcitava(false);
+    }
   }
 
-  const najjeftiniji = rezultati?.[0];
   const najjeftinijiUvoz = rezultati
-    ?.filter((red) => red.zemlja === "Nemačka")
+    ?.filter((red) => red.zemlja === "DE")
     .sort((a, b) => a.ukupno - b.ukupno)[0];
   const najjeftinijiDomaci = rezultati
-    ?.filter((red) => red.zemlja === "Srbija")
+    ?.filter((red) => red.zemlja === "RS")
     .sort((a, b) => a.ukupno - b.ukupno)[0];
-  const uvozSeIsplati =
-    najjeftinijiUvoz != null &&
-    najjeftinijiDomaci != null &&
-    najjeftinijiUvoz.ukupno < najjeftinijiDomaci.ukupno;
+
+  function zakljucakTekst() {
+    const delovi: string[] = [];
+
+    if (najjeftinijiDomaci) {
+      delovi.push(
+        `Najjeftinija domaća opcija: ${najjeftinijiDomaci.naziv} za ${formatBroj(najjeftinijiDomaci.ukupno)} EUR.`,
+      );
+    } else {
+      delovi.push("Nije pronađena nijedna domaća opcija.");
+    }
+
+    if (najjeftinijiUvoz) {
+      delovi.push(
+        `Najjeftinija uvozna opcija: ${najjeftinijiUvoz.naziv} za ${formatBroj(najjeftinijiUvoz.ukupno)} EUR.`,
+      );
+    } else {
+      delovi.push("Nije pronađena nijedna uvozna opcija.");
+    }
+
+    if (najjeftinijiDomaci && najjeftinijiUvoz) {
+      const razlika = Math.abs(
+        najjeftinijiDomaci.ukupno - najjeftinijiUvoz.ukupno,
+      );
+      if (najjeftinijiUvoz.ukupno < najjeftinijiDomaci.ukupno) {
+        delovi.push(
+          `Uvoz se isplati — uvozna opcija je jeftinija za ${formatBroj(razlika)} EUR.`,
+        );
+      } else if (najjeftinijiUvoz.ukupno > najjeftinijiDomaci.ukupno) {
+        delovi.push(
+          `Uvoz se ne isplati — domaća opcija je jeftinija za ${formatBroj(razlika)} EUR.`,
+        );
+      } else {
+        delovi.push("Uvoz i domaća opcija koštaju isto.");
+      }
+    }
+
+    return delovi.join(" ");
+  }
 
   return (
     <div className="flex min-h-full flex-1 items-start justify-center overflow-y-auto bg-zinc-950 px-4 py-16">
@@ -152,6 +169,7 @@ export default function Home() {
             <input
               id="model"
               type="text"
+              required
               value={model}
               onChange={(e) => setModel(e.target.value)}
               placeholder="npr. Volkswagen Golf"
@@ -168,6 +186,7 @@ export default function Home() {
                 id="maxCena"
                 type="number"
                 min={0}
+                required
                 value={maxCena}
                 onChange={(e) => setMaxCena(e.target.value)}
                 placeholder="15000"
@@ -186,6 +205,7 @@ export default function Home() {
                 id="maxKilometraza"
                 type="number"
                 min={0}
+                required
                 value={maxKilometraza}
                 onChange={(e) => setMaxKilometraza(e.target.value)}
                 placeholder="150000"
@@ -203,6 +223,7 @@ export default function Home() {
               type="number"
               min={1990}
               max={new Date().getFullYear()}
+              required
               value={godisteOd}
               onChange={(e) => setGodisteOd(e.target.value)}
               placeholder="2018"
@@ -212,28 +233,18 @@ export default function Home() {
 
           <button
             type="submit"
-            className="w-full rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-zinc-900"
+            disabled={ucitava}
+            className="w-full rounded-xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-zinc-900 disabled:cursor-not-allowed disabled:bg-emerald-500/50 disabled:hover:bg-emerald-500/50"
           >
             Pronađi
           </button>
         </form>
 
         <section aria-label="Rezultati pretrage" className="mt-8">
-          {rezultati && najjeftiniji ? (
+          {rezultati && rezultati.length > 0 ? (
             <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/70 shadow-xl">
               <p className="border-b border-zinc-800 px-6 py-5 text-base leading-7 text-zinc-200">
-                Najjeftinija opcija:{" "}
-                <span className="font-semibold text-zinc-50">
-                  {najjeftiniji.naziv}
-                </span>{" "}
-                za{" "}
-                <span className="font-semibold text-emerald-400">
-                  {formatBroj(najjeftiniji.ukupno)} EUR
-                </span>
-                .{" "}
-                {uvozSeIsplati
-                  ? "Uvoz se isplati u odnosu na domaću ponudu."
-                  : "Uvoz se ne isplati u odnosu na domaću ponudu."}
+                {zakljucakTekst()}
               </p>
 
               <div className="overflow-x-auto">
@@ -241,23 +252,24 @@ export default function Home() {
                   <thead>
                     <tr className="bg-zinc-950/80 text-[11px] font-semibold tracking-wide text-zinc-400 uppercase sm:text-xs">
                       <th className="whitespace-nowrap px-3 py-3">Zemlja</th>
-                      <th className="whitespace-nowrap px-3 py-3">Model</th>
+                      <th className="whitespace-nowrap px-3 py-3">Naziv</th>
                       <th className="whitespace-nowrap px-3 py-3">Godište</th>
                       <th className="whitespace-nowrap px-3 py-3">Kilometraža</th>
                       <th className="whitespace-nowrap px-3 py-3">Cena oglasa</th>
-                      <th className="whitespace-nowrap px-3 py-3">Transport</th>
-                      <th className="whitespace-nowrap px-3 py-3">Carina+PDV</th>
-                      <th className="sticky right-0 whitespace-nowrap bg-zinc-950 px-3 py-3 shadow-[-8px_0_12px_rgba(0,0,0,0.35)]">
+                      <th className="whitespace-nowrap px-3 py-3">
                         Ukupno u Beogradu
                       </th>
+                      <th className="whitespace-nowrap px-3 py-3">Link</th>
                     </tr>
                   </thead>
                   <tbody>
                     {rezultati.map((red, index) => {
                       const jeNajjeftiniji = index === 0;
+                      const ukupnoBeograd =
+                        red.zemlja === "RS" ? red.cenaEur : red.ukupno;
                       return (
                         <tr
-                          key={`${red.zemlja}-${red.model}-${red.godiste}-${red.kilometraza}`}
+                          key={`${red.zemlja}-${red.url}-${index}`}
                           className={`border-t border-zinc-800 ${
                             jeNajjeftiniji
                               ? "bg-emerald-500/10"
@@ -265,38 +277,40 @@ export default function Home() {
                           }`}
                         >
                           <td className="whitespace-nowrap px-3 py-3.5 text-zinc-200">
-                            {red.zemlja}
+                            <span aria-label={red.zemlja === "DE" ? "Nemačka" : "Srbija"}>
+                              {zastavica(red.zemlja)}
+                            </span>
                           </td>
-                          <td className="whitespace-nowrap px-3 py-3.5 font-medium text-zinc-50">
-                            {red.model}
+                          <td className="px-3 py-3.5 font-medium text-zinc-50">
+                            {red.naziv}
                           </td>
                           <td className="whitespace-nowrap px-3 py-3.5 tabular-nums text-zinc-300">
                             {red.godiste}
                           </td>
                           <td className="whitespace-nowrap px-3 py-3.5 tabular-nums text-zinc-300">
-                            {formatBroj(red.kilometraza)} km
+                            {formatBroj(red.km)} km
                           </td>
                           <td className="whitespace-nowrap px-3 py-3.5 tabular-nums text-zinc-300">
-                            {formatBroj(red.cenaOglasa)} EUR
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-3.5 tabular-nums text-zinc-300">
-                            {red.transport == null
-                              ? "—"
-                              : `${formatBroj(red.transport)} EUR`}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-3.5 tabular-nums text-zinc-300">
-                            {red.carinaPdv == null
-                              ? "—"
-                              : `${formatBroj(red.carinaPdv)} EUR`}
+                            {formatBroj(red.cenaEur)} EUR
                           </td>
                           <td
-                            className={`sticky right-0 whitespace-nowrap px-3 py-3.5 tabular-nums font-semibold shadow-[-8px_0_12px_rgba(0,0,0,0.35)] ${
+                            className={`whitespace-nowrap px-3 py-3.5 tabular-nums font-semibold ${
                               jeNajjeftiniji
-                                ? "bg-emerald-950 text-emerald-400"
-                                : "bg-zinc-900 text-zinc-50"
+                                ? "text-emerald-400"
+                                : "text-zinc-50"
                             }`}
                           >
-                            {formatBroj(red.ukupno)} EUR
+                            {formatBroj(ukupnoBeograd)} EUR
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-3.5">
+                            <a
+                              href={red.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-medium text-emerald-400 underline-offset-2 hover:text-emerald-300 hover:underline"
+                            >
+                              Oglas
+                            </a>
                           </td>
                         </tr>
                       );
@@ -306,7 +320,13 @@ export default function Home() {
               </div>
             </div>
           ) : (
-            <div className="mx-auto min-h-48 max-w-[700px] rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/40 p-6" />
+            <div className="mx-auto min-h-48 max-w-[700px] rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/40 p-6">
+              {poruka ? (
+                <p className="text-center text-base leading-7 text-zinc-300">
+                  {poruka}
+                </p>
+              ) : null}
+            </div>
           )}
         </section>
       </main>
