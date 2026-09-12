@@ -13,15 +13,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Auto uvoz kalkulator",
+  title: "Crossings",
   description:
-    "Uporedi cene oglasa iz Nemačke i Srbije, sa uračunatom carinom i PDV-om",
+    "What a car from Europe actually costs once it lands in your driveway",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
-      lang="sr"
+      lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
