@@ -20,6 +20,8 @@ type PretragaBody = {
 
 type Razlaganje = ReturnType<typeof izracunajUvoz>;
 
+type Pouzdanost = "visoka" | "niska";
+
 type Oglas = {
   naziv: string;
   zemlja: Zemlja;
@@ -29,6 +31,7 @@ type Oglas = {
   zapreminaCcm: number;
   gorivo: Gorivo;
   url: string;
+  pouzdanost: Pouzdanost;
 };
 
 type OglasSaUkupno = Oglas & { ukupno: number; razlaganje: Razlaganje };
@@ -160,6 +163,10 @@ function normalizujGorivo(value: unknown): Gorivo {
     : "benzin";
 }
 
+function normalizujPouzdanost(value: unknown): Pouzdanost {
+  return String(value ?? "").toLowerCase() === "niska" ? "niska" : "visoka";
+}
+
 function lokalnoRazlaganje(cenaEur: number): Razlaganje {
   const cenaOglas = Math.round(cenaEur);
   return {
@@ -199,6 +206,7 @@ function normalizujOglas(value: unknown): Oglas | null {
     zapreminaCcm: brojIliPodrazumevano(sirovo.zapreminaCcm, 1600),
     gorivo: normalizujGorivo(sirovo.gorivo),
     url,
+    pouzdanost: normalizujPouzdanost(sirovo.pouzdanost),
   };
 }
 
@@ -309,7 +317,7 @@ export async function POST(request: Request) {
 
     const sistemPrompt = `You extract used-car listing data from page text.
 Return ONLY a valid JSON array, with no markdown fences and no explanation.
-Format: [{"naziv","zemlja","godiste","km","cenaEur","zapreminaCcm","gorivo","url"}]
+Format: [{"naziv","zemlja","godiste","km","cenaEur","zapreminaCcm","gorivo","url","pouzdanost"}]
 Rules:
 - Include a listing if you can read at least the model name and price. Guess the rest reasonably.
 - zemlja must be one of: DE, AT, IT, RS, BA, ME.
@@ -318,6 +326,9 @@ Rules:
 - If mileage is missing, use 150000.
 - If fuel is missing, use "dizel". Fuel must be "dizel" or "benzin".
 - Prices are in EUR.
+- Za svaki oglas dodaj polje "pouzdanost": "visoka" ako si cenu, godište
+i kilometražu pročitao direktno iz teksta, "niska" ako si neki podatak
+procenio ili pogodio.
 - Ako naziv već sadrži marku, ne ponavljaj je.
 Vrati čist naziv bez duplikata marke.
 - Do not filter by price, mileage, or year. Return everything you find.

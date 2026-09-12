@@ -34,6 +34,7 @@ type Oglas = {
   url: string;
   ukupno: number;
   razlaganje: Razlaganje;
+  pouzdanost?: "visoka" | "niska";
 };
 
 const IZVORI: { value: Izvor; label: string }[] = [
@@ -126,13 +127,18 @@ function jeOglas(value: unknown): value is Oglas {
     typeof oglas.cenaEur === "number" &&
     typeof oglas.url === "string" &&
     typeof oglas.ukupno === "number" &&
-    jeRazlaganje(oglas.razlaganje)
+    jeRazlaganje(oglas.razlaganje) &&
+    (oglas.pouzdanost === undefined ||
+      oglas.pouzdanost === "visoka" ||
+      oglas.pouzdanost === "niska")
   );
 }
 
 const PORUKA_PRAZNO = "No listings found, try another model";
 const PORUKA_UCITAVANJE =
   "Searching listings across Europe... This can take up to 30 seconds";
+const PORUKA_NEMA_LOKALNIH =
+  "No local listings matched your filters. Try increasing max mileage or price to compare against the local market.";
 
 const selectClassName =
   "w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-zinc-50 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30";
@@ -258,6 +264,10 @@ export default function Home() {
   const najjeftinijiDomaci = rezultati
     ?.filter((red) => !jeIzvor(red.zemlja))
     .sort((a, b) => a.ukupno - b.ukupno)[0];
+  const nemaOglasaIzDestinacije =
+    !!rezultati &&
+    rezultati.length > 0 &&
+    rezultati.every((red) => red.zemlja !== destinacija);
 
   function zakljucakTekst() {
     const delovi: string[] = [];
@@ -526,6 +536,17 @@ export default function Home() {
                 </div>
               )}
 
+              {nemaOglasaIzDestinacije ? (
+                <div
+                  role="status"
+                  className="rounded-2xl border border-yellow-500/40 bg-yellow-500/10 px-6 py-4"
+                >
+                  <p className="text-sm leading-6 text-yellow-200">
+                    {PORUKA_NEMA_LOKALNIH}
+                  </p>
+                </div>
+              ) : null}
+
               <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/70 shadow-xl">
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse text-left text-xs sm:text-sm">
@@ -673,6 +694,11 @@ function FragmentRow({
         </td>
         <td className="whitespace-nowrap px-3 py-3.5 tabular-nums text-zinc-300">
           {formatBroj(red.km)} km
+          {red.pouzdanost === "niska" ? (
+            <span className="ml-1 text-xs text-zinc-500" title="Estimated value">
+              ~
+            </span>
+          ) : null}
         </td>
         <td className="whitespace-nowrap px-3 py-3.5 tabular-nums text-zinc-300">
           {formatBroj(red.cenaEur)} EUR
